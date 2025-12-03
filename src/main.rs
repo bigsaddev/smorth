@@ -1,18 +1,20 @@
 mod interpreter;
 mod tokenizer;
-mod value;
+mod types;
 mod words;
 
 use interpreter::Interpreter;
 use std::io::{self, Write};
 
 // Entry Point
+// Add file support later on
 fn main() {
     let mut interp = Interpreter::new();
 
     println!("Smorth | Stack Language");
     println!("Type 'bye' to exit.");
 
+    //Stupid REPL for now
     loop {
         print!("> ");
         io::stdout().flush().unwrap();

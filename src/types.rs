@@ -1,5 +1,5 @@
 #[derive(Debug, Clone)]
-pub enum Value {
+pub enum Type {
     Int(i64),
     Float(f64),
     String(String),
