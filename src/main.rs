@@ -5,6 +5,7 @@ enum Value {
     Int(i64),
     Float(f64),
     String(String),
+    Bool(bool),
 }
 
 struct Interpreter {
@@ -29,13 +30,81 @@ impl Interpreter {
         interp
             .dictionary
             .insert("*".to_string(), |interp| interp.binary_op(|a, b| a * b));
-        interp
-            .dictionary
-            .insert("/".to_string(), |interp| interp.binary_op(|a, b| a / b));
+        interp.dictionary.insert("/".to_string(), |interp| {
+            interp.binary_op(|a: f64, b| a / b)
+        });
 
         interp.dictionary.insert("sqrt".to_string(), |interp| {
             let (num, _) = interp.pop_number()?;
             interp.stack.push(Value::Float(num.sqrt()));
+            Ok(())
+        });
+
+        // Comparison Operations
+        //Equal
+        interp.dictionary.insert("==".to_string(), |interp| {
+            let tos = interp.stack.pop().ok_or("Stack underflow!")?;
+            let nos = interp.stack.pop().ok_or("Stack underflow!")?;
+
+            let result = match (nos, tos) {
+                (Value::Int(a), Value::Int(b)) => a == b,
+                (Value::Float(a), Value::Float(b)) => a == b,
+                (Value::String(a), Value::String(b)) => a == b,
+                (Value::Bool(a), Value::Bool(b)) => a == b,
+                // Mixed int/float comparison
+                (Value::Int(a), Value::Float(b)) => (a as f64) == b,
+                (Value::Float(a), Value::Int(b)) => a == (b as f64),
+                // Different types are not equal
+                _ => false,
+            };
+            interp.stack.push(Value::Bool(result));
+            Ok(())
+        });
+        //Not Equal
+        interp.dictionary.insert("!=".to_string(), |interp| {
+            let tos = interp.stack.pop().ok_or("Stack underflow!")?;
+            let nos = interp.stack.pop().ok_or("Stack underflow!")?;
+
+            let result = match (nos, tos) {
+                (Value::Int(a), Value::Int(b)) => a != b,
+                (Value::Float(a), Value::Float(b)) => a != b,
+                (Value::String(a), Value::String(b)) => a != b,
+                (Value::Bool(a), Value::Bool(b)) => a != b,
+                // Mixed int/float comparison
+                (Value::Int(a), Value::Float(b)) => (a as f64) != b,
+                (Value::Float(a), Value::Int(b)) => a != (b as f64),
+                // Different types are not equal
+                _ => false,
+            };
+            interp.stack.push(Value::Bool(result));
+            Ok(())
+        });
+        // Less than
+        interp.dictionary.insert("<".to_string(), |interp| {
+            let (tos, _) = interp.pop_number()?;
+            let (nos, _) = interp.pop_number()?;
+            interp.stack.push(Value::Bool(nos < tos));
+            Ok(())
+        });
+        // Less than or equal
+        interp.dictionary.insert("<=".to_string(), |interp| {
+            let (tos, _) = interp.pop_number()?;
+            let (nos, _) = interp.pop_number()?;
+            interp.stack.push(Value::Bool(nos <= tos));
+            Ok(())
+        });
+        // Greater than
+        interp.dictionary.insert(">".to_string(), |interp| {
+            let (tos, _) = interp.pop_number()?;
+            let (nos, _) = interp.pop_number()?;
+            interp.stack.push(Value::Bool(nos > tos));
+            Ok(())
+        });
+        // Greater than or equal
+        interp.dictionary.insert(">=".to_string(), |interp| {
+            let (tos, _) = interp.pop_number()?;
+            let (nos, _) = interp.pop_number()?;
+            interp.stack.push(Value::Bool(nos >= tos));
             Ok(())
         });
 
@@ -49,6 +118,17 @@ impl Interpreter {
                 }
                 None => Err("Stack is empty!".to_string()),
             }
+        });
+        interp.dictionary.insert("swap".to_string(), |interp| {
+            let tos = interp.stack.pop().ok_or("Stack underflow!")?;
+            let nos = interp.stack.pop().ok_or("Stack underflow!")?;
+            interp.stack.push(tos);
+            interp.stack.push(nos);
+            Ok(())
+        });
+        interp.dictionary.insert("drop".to_string(), |interp| {
+            interp.stack.pop().ok_or("Stack underflow!")?;
+            Ok(())
         });
 
         // Output and Consume the top-most value from the stack
@@ -67,12 +147,17 @@ impl Interpreter {
                     println!("{}", f);
                     Ok(())
                 }
+                Some(Value::Bool(b)) => {
+                    println!("{}", b);
+                    Ok(())
+                }
                 None => Err("Stack is empty!".to_string()),
             });
 
         interp
     }
 
+    // Helper functions
     fn pop_number(&mut self) -> Result<(f64, bool), String> {
         match self.stack.pop() {
             Some(Value::Int(n)) => Ok((n as f64, true)), // true = was int
@@ -104,6 +189,7 @@ impl Interpreter {
         Ok(())
     }
 
+    // Evaluate the tokens
     fn eval(&mut self, input: &str) -> Result<(), String> {
         let tokens = self.tokenize(input);
 
@@ -145,11 +231,13 @@ impl Interpreter {
                 Value::Int(n) => print!("{}", n),
                 Value::String(s) => print!("\"{}\"", s),
                 Value::Float(f) => print!("{}", f),
+                Value::Bool(b) => print!("{}", b),
             }
         }
         println!("]");
     }
 
+    // Tokenizer
     fn tokenize(&self, input: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         let mut current = String::new();
@@ -186,6 +274,7 @@ impl Interpreter {
     }
 }
 
+// Entry Point
 fn main() {
     let mut interp = Interpreter::new();
 
