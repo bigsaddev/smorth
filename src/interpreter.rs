@@ -3,10 +3,19 @@ use crate::types::Type;
 use crate::words;
 use std::collections::HashMap;
 
+pub enum Word {
+    Native(fn(&mut Interpreter) -> Result<(), String>),
+    UserDefined(Vec<String>),
+}
+
 pub struct Interpreter {
     pub stack: Vec<Type>,
-    pub dictionary: HashMap<String, fn(&mut Interpreter) -> Result<(), String>>,
+    pub dictionary: HashMap<String, Word>,
     pub variables: HashMap<String, Type>,
+
+    compiling: bool,
+    current_word_name: String,
+    current_definition: Vec<String>,
 }
 
 impl Interpreter {
@@ -15,6 +24,9 @@ impl Interpreter {
             stack: Vec::new(),
             dictionary: HashMap::new(),
             variables: HashMap::new(),
+            compiling: false,
+            current_word_name: String::new(),
+            current_definition: Vec::new(),
         };
 
         words::register_math_words(&mut interp);
@@ -127,5 +139,9 @@ impl Interpreter {
             }
         }
         println!("]");
+    }
+
+    pub fn define_native(&mut self, name: &str, func: fn(&mut Interpreter) -> Result<(), String>) {
+        self.dictionary.insert(name.to_string(), Word::Native(func));
     }
 }
