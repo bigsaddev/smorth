@@ -4,8 +4,6 @@ pub mod logic;
 pub mod math;
 pub mod stack;
 
-// use crate::interpreter::Interpreter;
-
 // Re-export the register functions for convenience
 pub use comparison::register_comparison_words;
 pub use io::register_io_words;

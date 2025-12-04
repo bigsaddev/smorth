@@ -6,6 +6,7 @@ use std::collections::HashMap;
 pub struct Interpreter {
     pub stack: Vec<Type>,
     pub dictionary: HashMap<String, fn(&mut Interpreter) -> Result<(), String>>,
+    pub variables: HashMap<String, Type>,
 }
 
 impl Interpreter {
@@ -13,6 +14,7 @@ impl Interpreter {
         let mut interp = Interpreter {
             stack: Vec::new(),
             dictionary: HashMap::new(),
+            variables: HashMap::new(),
         };
 
         words::register_math_words(&mut interp);
@@ -61,12 +63,35 @@ impl Interpreter {
         let tokens = tokenize(input);
 
         for token in tokens {
-            // DEBUG: println!("DEBUG: Processing token '{}'", token);
+            println!("DEBUG: Processing token '{}'", token);
 
             // Check for string literal
             if token.starts_with("STR:") {
                 let s = &token[4..];
                 self.stack.push(Type::String(s.to_string()));
+                continue;
+            }
+
+            // Variable storage
+            if token.ends_with("!") && token.len() > 1 {
+                let var_name = &token[..token.len() - 1];
+                let value = self
+                    .stack
+                    .pop()
+                    .ok_or("Stack underflow! Need a value to store")?;
+                self.variables.insert(var_name.to_string(), value);
+                continue;
+            }
+            // Variable retrieval
+            if token.ends_with("@") && token.len() > 1 {
+                let var_name = &token[..token.len() - 1];
+                let value = self
+                    .variables
+                    .get(var_name)
+                    .ok_or_else(|| format!("Variable '{}' not found", var_name))?
+                    .clone();
+                self.stack.push(value);
+                continue;
             }
             // Floats
             else if token.contains('.') && token.parse::<f64>().is_ok() {
