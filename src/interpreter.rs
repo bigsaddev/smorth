@@ -35,6 +35,7 @@ impl Interpreter {
         words::register_comparison_words(&mut interp);
         words::register_logic_words(&mut interp);
         words::register_io_words(&mut interp);
+        words::register_string_words(&mut interp);
 
         interp
     }
