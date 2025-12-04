@@ -76,7 +76,8 @@ impl Interpreter {
         let tokens = tokenize(input);
 
         for token in tokens {
-            println!("DEBUG: Processing token '{}'", token);
+            // Debug the Stack and Token Evaluation
+            //println!("DEBUG: Processing token '{}'", token);
 
             // Handle word definition start
             if token == ":" {
