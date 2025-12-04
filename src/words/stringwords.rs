@@ -81,4 +81,46 @@ pub fn register_string_words(interp: &mut Interpreter) {
             Ok(())
         }),
     );
+
+    // String interpolation
+    interp.dictionary.insert(
+        "format".to_string(),
+        Word::Native(|interp| {
+            // Pop the format string
+            let fmt = match interp.stack.pop() {
+                Some(Type::String(s)) => s,
+                Some(_) => return Err("Expected format string".to_string()),
+                None => return Err("Stack underflow!".to_string()),
+            };
+
+            // Count placeholders
+            let placeholder_count = fmt.matches("$").count();
+
+            // Pop values (in reverse since stack is LIFO)
+            let mut values = Vec::new();
+            for _ in 0..placeholder_count {
+                let val = interp
+                    .stack
+                    .pop()
+                    .ok_or("Not enough values for format string")?;
+                values.push(val);
+            }
+            values.reverse(); // Reverse to get correct order
+
+            // Build the result string
+            let mut result = fmt.clone();
+            for val in values {
+                let val_str = match val {
+                    Type::Int(n) => n.to_string(),
+                    Type::Float(f) => f.to_string(),
+                    Type::String(s) => s,
+                    Type::Bool(b) => b.to_string(),
+                };
+                result = result.replacen("$", &val_str, 1);
+            }
+
+            interp.stack.push(Type::String(result));
+            Ok(())
+        }),
+    );
 }
