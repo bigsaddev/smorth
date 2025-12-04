@@ -3,6 +3,7 @@ use crate::types::Type;
 use crate::words;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub enum Word {
     Native(fn(&mut Interpreter) -> Result<(), String>),
     UserDefined(Vec<String>),
@@ -77,51 +78,115 @@ impl Interpreter {
         for token in tokens {
             println!("DEBUG: Processing token '{}'", token);
 
-            // Check for string literal
-            if token.starts_with("STR:") {
-                let s = &token[4..];
-                self.stack.push(Type::String(s.to_string()));
+            // Handle word definition start
+            if token == ":" {
+                if self.compiling {
+                    return Err("Already defining a word".to_string());
+                }
+                self.compiling = true;
+                self.current_definition.clear();
+                self.current_word_name.clear();
                 continue;
             }
 
-            // Variable storage
-            if token.ends_with("!") && token.len() > 1 {
-                let var_name = &token[..token.len() - 1];
-                let value = self
-                    .stack
-                    .pop()
-                    .ok_or("Stack underflow! Need a value to store")?;
-                self.variables.insert(var_name.to_string(), value);
+            // Handle word definition end
+            if token == ";" {
+                if !self.compiling {
+                    return Err("Not defining a word".to_string());
+                }
+                if self.current_word_name.is_empty() {
+                    return Err("No word name specified".to_string());
+                }
+
+                let name = self.current_word_name.clone();
+                let def = self.current_definition.clone();
+                self.dictionary.insert(name, Word::UserDefined(def));
+
+                self.compiling = false;
+                self.current_word_name.clear();
+                self.current_definition.clear();
                 continue;
             }
-            // Variable retrieval
-            if token.ends_with("@") && token.len() > 1 {
-                let var_name = &token[..token.len() - 1];
-                let value = self
-                    .variables
-                    .get(var_name)
-                    .ok_or_else(|| format!("Variable '{}' not found", var_name))?
-                    .clone();
-                self.stack.push(value);
+
+            // If we're compiling, collect tokens
+            if self.compiling {
+                if self.current_word_name.is_empty() {
+                    // First token after : is the word name
+                    self.current_word_name = token.clone();
+                } else {
+                    // Rest are the definition
+                    self.current_definition.push(token.clone());
+                }
                 continue;
             }
-            // Floats
-            else if token.contains('.') && token.parse::<f64>().is_ok() {
-                let f = token.parse::<f64>().unwrap();
-                self.stack.push(Type::Float(f))
-            }
-            // Integers
-            else if let Ok(n) = token.parse::<i64>() {
-                self.stack.push(Type::Int(n))
-            }
-            // Dictionary lookup
-            else if let Some(&func) = self.dictionary.get(&token) {
-                func(self)?;
-            } else {
-                return Err(format!("Unknown token: {}", token));
+
+            // Not compiling - execute the token normally
+            self.eval_token(&token)?;
+        }
+
+        Ok(())
+    }
+
+    // Helper method to evaluate a single token
+    fn eval_token(&mut self, token: &str) -> Result<(), String> {
+        // Check for string literal
+        if token.starts_with("STR:") {
+            let s = &token[4..];
+            self.stack.push(Type::String(s.to_string()));
+            return Ok(());
+        }
+
+        // Variable storage
+        if token.ends_with("!") && token.len() > 1 {
+            let var_name = &token[..token.len() - 1];
+            let value = self
+                .stack
+                .pop()
+                .ok_or("Stack underflow! Need a value to store")?;
+            self.variables.insert(var_name.to_string(), value);
+            return Ok(());
+        }
+
+        // Variable retrieval
+        if token.ends_with("@") && token.len() > 1 {
+            let var_name = &token[..token.len() - 1];
+            let value = self
+                .variables
+                .get(var_name)
+                .ok_or_else(|| format!("Variable '{}' not found", var_name))?
+                .clone();
+            self.stack.push(value);
+            return Ok(());
+        }
+
+        // Floats
+        if token.contains('.') && token.parse::<f64>().is_ok() {
+            let f = token.parse::<f64>().unwrap();
+            self.stack.push(Type::Float(f));
+            return Ok(());
+        }
+
+        // Integers
+        if let Ok(n) = token.parse::<i64>() {
+            self.stack.push(Type::Int(n));
+            return Ok(());
+        }
+
+        // Dictionary lookup
+        if let Some(word) = self.dictionary.get(token).cloned() {
+            match word {
+                Word::Native(func) => return func(self),
+                Word::UserDefined(tokens) => {
+                    // Execute each token in the definition
+                    for t in tokens {
+                        self.eval_token(&t)?;
+                    }
+                    return Ok(());
+                }
             }
         }
-        Ok(())
+
+        Err(format!("Unknown token: {}", token))
     }
 
     // Show what's on the stack
@@ -139,9 +204,5 @@ impl Interpreter {
             }
         }
         println!("]");
-    }
-
-    pub fn define_native(&mut self, name: &str, func: fn(&mut Interpreter) -> Result<(), String>) {
-        self.dictionary.insert(name.to_string(), Word::Native(func));
     }
 }
