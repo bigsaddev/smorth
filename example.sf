@@ -5,6 +5,6 @@
 3 cube .
 
 42 answer!
-answer@ .
 
 "Hello" " World" .. .
+answer@ "It's such a beautiful day, the sun shines! It's $°C outside!" format .
